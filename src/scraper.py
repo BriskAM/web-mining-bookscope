@@ -45,3 +45,24 @@ def scrape_listings(delay=0.2):
         url = urljoin(url, nxt["href"]) if nxt else None
         time.sleep(delay)
     return out
+
+
+def parse_detail(url):
+    """Fetch one book page: category, description, UPC, review count."""
+    soup = get_soup(url, requests.Session())
+    crumbs = soup.select("ul.breadcrumb li a")
+    desc = soup.select_one("#product_description")
+    table = {r.th.text: r.td.text for r in soup.select("table.table-striped tr")}
+    return {
+        "url": url,
+        "category": crumbs[-1].text.strip() if crumbs else None,
+        "description": desc.find_next_sibling("p").text.strip() if desc else "",
+        "upc": table.get("UPC"),
+        "num_reviews": int(table.get("Number of reviews", 0)),
+    }
+
+
+def scrape_details(urls, workers=8):
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(workers) as ex:
+        return list(ex.map(parse_detail, urls))
